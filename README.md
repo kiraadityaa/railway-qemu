@@ -1,185 +1,79 @@
 <div align="center">
 
-# 🖥️ Railway QEMU Mint
+# Railway QEMU Mint
 
-### Run a full Linux Mint virtual machine on Railway with QEMU + TCG + noVNC
+**Run a full Linux Mint virtual machine on Railway using QEMU software emulation and noVNC.**
 
-<p>
-  <img src="https://img.shields.io/badge/Railway-Deploy-8B5CF6?style=for-the-badge&logo=railway&logoColor=white" alt="Railway">
-  <img src="https://img.shields.io/badge/QEMU-11.x-FF6600?style=for-the-badge&logo=qemu&logoColor=white" alt="QEMU">
-  <img src="https://img.shields.io/badge/Linux-Mint-87CF3E?style=for-the-badge&logo=linuxmint&logoColor=white" alt="Linux Mint">
-  <img src="https://img.shields.io/badge/noVNC-Web--based-4CAF50?style=for-the-badge" alt="noVNC">
-  <img src="https://img.shields.io/badge/KVM-Disabled-orange?style=for-the-badge" alt="KVM Disabled">
-</p>
-
-<p>
-  <strong>Linux Mint in your browser — powered by QEMU software emulation.</strong>
-</p>
-
-<p>
-  <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-configuration">Configuration</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-performance">Performance</a> •
-  <a href="#-troubleshooting">Troubleshooting</a>
-</p>
+[![Railway](https://img.shields.io/badge/Railway-Deploy-8B5CF6?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
+[![QEMU](https://img.shields.io/badge/QEMU-11.x-FF6600?style=flat-square)](https://www.qemu.org/)
+[![Linux Mint](https://img.shields.io/badge/Linux%20Mint-latest-87CF3E?style=flat-square&logo=linuxmint&logoColor=white)](https://linuxmint.com/)
 
 </div>
 
 ---
 
-## ✨ Overview
+## Overview
 
-**Railway QEMU Mint** is a lightweight deployment setup for running a Linux Mint virtual machine inside a Railway container using:
+Railway QEMU Mint deploys a Linux Mint desktop accessible from any browser. It is built specifically for managed container environments where `/dev/kvm` is not available. Rather than failing on missing hardware acceleration, the setup explicitly falls back to QEMU's software CPU emulation (TCG) via:
 
-- 🖥️ **QEMU** — hardware virtualization/emulation
-- 🐢 **TCG** — software CPU emulation when KVM is unavailable
-- 🌐 **noVNC** — browser-based graphical console
-- 🚂 **Railway** — cloud deployment platform
-- 💾 **Container storage** — VM disk and runtime data
-
-The project is specifically designed for environments where:
-
-> `/dev/kvm` is unavailable.
-
-Instead of crashing when KVM cannot be accessed, QEMU is configured to run without hardware acceleration.
-
----
-
-## 🎯 Why This Project?
-
-Traditional QEMU deployments often assume that the host provides:
-
-```text
-/dev/kvm
-
-That is not always available in managed container environments.
-
-Railway containers may not expose KVM to the application container, causing conventional QEMU configurations to fail with errors similar to:
-
-ERROR: See the FAQ for possible causes,
-or disable acceleration by adding the "KVM=N" variable
-
-This project solves that problem by explicitly disabling KVM:
-
+```
 KVM=N
+```
 
-QEMU then falls back to software emulation through TCG.
+The stack:
 
+| Component | Role |
+|-----------|------|
+| **QEMU** | Hardware emulation |
+| **TCG** | Software CPU backend when KVM is unavailable |
+| **noVNC** | Browser-based graphical console |
+| **Railway** | Cloud container platform |
 
 ---
 
-🧩 Architecture
+## Architecture
 
-┌─────────────────────────┐
-                         │        Railway          │
-                         │                         │
-                         │      Container          │
-                         │                         │
-                         │  ┌───────────────────┐  │
-Browser ── HTTPS ───────►│  │      noVNC        │  │
-                         │  │      :8006         │  │
-                         │  └─────────┬─────────┘  │
-                         │            │            │
-                         │            ▼            │
-                         │  ┌───────────────────┐  │
-                         │  │       QEMU        │  │
-                         │  │                   │  │
-                         │  │   Accelerator:    │  │
-                         │  │       TCG         │  │
-                         │  └─────────┬─────────┘  │
-                         │            │            │
-                         │            ▼            │
-                         │  ┌───────────────────┐  │
-                         │  │    Linux Mint     │  │
-                         │  │     Virtual VM    │  │
-                         │  └───────────────────┘  │
-                         │                         │
-                         └─────────────────────────┘
-
-Request flow
-
+```
 Browser
-   │
-   │ HTTPS
-   ▼
+  │
+  │ HTTPS
+  ▼
 Railway Public Domain
-   │
-   │ :8006
-   ▼
+  │
+  │ :8006
+  ▼
 noVNC
-   │
-   │ WebSocket
-   ▼
-QEMU VNC Server
-   │
-   ▼
+  │
+  │ WebSocket
+  ▼
+QEMU VNC Server (TCG)
+  │
+  ▼
 Linux Mint VM
-
-
----
-
-🚀 Features
-
-Feature	Status
-
-Linux Mint VM	✅
-Railway deployment	✅
-QEMU	✅
-noVNC	✅
-Browser-based desktop	✅
-KVM required	❌
-TCG software emulation	✅
-Public Railway URL	✅
-SSH support	✅
-VNC support	✅
-Persistent storage	⚠️ Optional
-Hardware acceleration	❌
-
-
+  │
+  ▼
+/storage  (ephemeral by default, persistent with Railway Volume)
+```
 
 ---
 
-📦 Requirements
+## Quick Start
 
-You only need:
+### 1. Clone the repository
 
-A Railway account
-
-A Git repository
-
-Railway project/service
-
-A public Railway domain
-
-
-No KVM device is required.
-
-No special Docker runtime configuration is required for the basic TCG setup.
-
-
----
-
-⚡ Quick Start
-
-1. Clone the repository
-
+```bash
 git clone https://github.com/YOUR_USERNAME/railway-qemu-mint.git
-
 cd railway-qemu-mint
+```
 
+### 2. Create the Dockerfile
 
----
-
-2. Create Dockerfile
-
+```dockerfile
 FROM qemux/qemu:latest
 
 RUN mkdir -p /storage
 
 ENV KVM="N"
-
 ENV BOOT="mint"
 ENV CPU_CORES="8"
 ENV RAM_SIZE="16G"
@@ -188,465 +82,155 @@ ENV DISK_SIZE="550G"
 EXPOSE 22
 EXPOSE 5900
 EXPOSE 8006
+```
 
+### 3. Push to GitHub
 
----
-
-3. Push to GitHub
-
+```bash
 git add Dockerfile README.md
 git commit -m "Initial Railway QEMU Mint setup"
 git push
+```
 
+### 4. Create a Railway project
 
----
+Create a new project on Railway, connect your repository, and deploy. Railway auto-detects the Dockerfile.
 
-4. Create a Railway project
+### 5. Generate a public domain
 
-Create a new project on Railway and deploy the repository.
+```
+Railway → Service → Settings → Networking → Public Networking → Generate Domain
+```
 
-Railway will automatically detect the Dockerfile.
+Your VM will be accessible at:
 
-
----
-
-5. Generate a public domain
-
-Open:
-
-Railway
-→ Service
-→ Settings
-→ Networking
-→ Public Networking
-→ Generate Domain
-
-After deployment, Railway will provide a public domain similar to:
-
+```
 https://your-project.up.railway.app
-
-
----
-
-🌐 Accessing Linux Mint
-
-The primary web interface is:
-
-HTTP/HTTPS
-     │
-     ▼
-   Port 8006
-     │
-     ▼
-   noVNC
-
-Open your Railway public URL in a browser.
-
-For example:
-
-https://your-project.up.railway.app
-
-The noVNC interface should appear once the VM has finished booting.
-
+```
 
 ---
 
-🔌 Ports
+## Accessing the Desktop
 
-Port	Service	Purpose
+Open your Railway public URL in a browser. The noVNC interface loads once the VM finishes booting. No VNC client is needed.
 
-8006	noVNC	Browser-based desktop
-5900	VNC	Direct VNC access
-22	SSH	SSH access, if enabled
+**Default login flow:**
 
-
-Recommended
-
-For normal usage, use:
-
-8006
-
-You do not need a VNC client when using noVNC.
-
+```
+Railway URL → noVNC → Linux Mint login screen → Desktop
+```
 
 ---
 
-⚙️ Configuration
+## Ports
 
-The VM can be customized using environment variables.
+| Port | Service | Notes |
+|------|---------|-------|
+| `8006` | noVNC | Primary browser access |
+| `5900` | VNC | Direct VNC client access |
+| `22` | SSH | Optional SSH access |
 
-Boot OS
-
-BOOT=mint
-
-
----
-
-CPU
-
-CPU_CORES=8
-
-Increase or decrease depending on your Railway resource limits.
-
+For normal use, only port `8006` is needed.
 
 ---
 
-RAM
+## Configuration
 
-RAM_SIZE=16G
+All configuration is done through environment variables.
 
-Examples:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BOOT` | `mint` | OS to boot |
+| `CPU_CORES` | `8` | Number of virtual CPU cores |
+| `RAM_SIZE` | `16G` | RAM allocated to the VM |
+| `DISK_SIZE` | `550G` | Virtual disk size |
+| `KVM` | `N` | Must remain `N` on Railway |
 
-RAM_SIZE=4G
-RAM_SIZE=8G
-RAM_SIZE=16G
-
-Make sure the configured RAM is actually available to the Railway service.
-
-
----
-
-Disk
-
-DISK_SIZE=550G
-
-This controls the virtual disk size used by the QEMU environment.
-
-> A large virtual disk size does not necessarily mean that Railway provides that amount of persistent physical storage.
-
-
-
+> **Note:** A large `DISK_SIZE` does not mean Railway provides that amount of persistent physical storage. The virtual disk is backed by the container filesystem, which is ephemeral unless a Railway Volume is attached.
 
 ---
 
-🐢 Why KVM Is Disabled
+## KVM vs. TCG
 
-The most important configuration is:
+QEMU normally uses `/dev/kvm` for hardware-assisted virtualization. Railway containers do not expose this device, so KVM must be explicitly disabled:
 
+```
 KVM=N
+```
 
-Normally QEMU attempts to use:
+This switches QEMU to **TCG** (Tiny Code Generator), a software CPU emulator.
 
-/dev/kvm
+| | KVM | TCG |
+|---|---|---|
+| Hardware acceleration | Yes | No |
+| Requires `/dev/kvm` | Yes | No |
+| Works in managed containers | Sometimes | Yes |
+| Performance | Fast | Slower |
 
-for hardware-assisted virtualization.
-
-However, managed container platforms may not expose KVM.
-
-Without special handling, QEMU may stop during startup.
-
-This project intentionally disables KVM:
-
-KVM=N
-
-and allows QEMU to use:
-
-TCG
-
-instead.
-
+TCG is slower than KVM. CPU-intensive tasks — compiling, video playback, heavy multitasking — will be noticeably slower than on a KVM-backed VM. This setup prioritizes compatibility over performance.
 
 ---
 
-⚠️ TCG vs KVM
+## Resource Profiles
 
-	KVM	TCG
+### Lightweight
 
-Hardware acceleration	✅	❌
-Requires /dev/kvm	✅	❌
-Works without KVM	❌	✅
-Performance	🚀 Fast	🐢 Slower
-Suitable for managed containers	Sometimes	✅
-CPU emulation	Hardware-assisted	Software
+```dockerfile
+ENV CPU_CORES="2"
+ENV RAM_SIZE="4G"
+ENV DISK_SIZE="40G"
+```
 
+Suitable for: terminal usage, lightweight applications.
 
-Important
+### Balanced
 
-TCG is significantly slower than KVM.
+```dockerfile
+ENV CPU_CORES="4"
+ENV RAM_SIZE="8G"
+ENV DISK_SIZE="80G"
+```
 
-Desktop workloads such as:
+Suitable for: general desktop use, light development, browsing.
 
-Web browsers
+### Heavy
 
-Video playback
+```dockerfile
+ENV CPU_CORES="8"
+ENV RAM_SIZE="16G"
+ENV DISK_SIZE="150G"
+```
 
-Compiling software
+Suitable for: development, multiple applications, larger workloads.
 
-Large applications
-
-Heavy multitasking
-
-
-may perform considerably slower than they would on a normal KVM-backed VM.
-
-This project prioritizes compatibility with environments without KVM.
-
+Actual performance depends on Railway's host resources and TCG overhead.
 
 ---
 
-💾 Storage
+## Storage
 
-The default configuration does not require a Railway Volume.
+The Dockerfile creates `/storage` at build time:
 
-The Dockerfile creates:
-
-/storage
-
-during image build:
-
+```dockerfile
 RUN mkdir -p /storage
+```
 
-This satisfies the QEMU container startup requirement.
+Without a Railway Volume, this directory — and the VM's disk — is **ephemeral**. Data is lost when the container restarts.
 
-⚠️ Ephemeral storage
+To persist VM data, attach a Railway Volume mounted at `/storage`:
 
-Without a Railway Volume, VM data should be considered ephemeral.
-
-A container replacement can cause the virtual machine's storage to disappear.
-
-If you need persistent VM data, add a Railway Volume mounted at:
-
-/storage
-
-Then the architecture becomes:
-
-QEMU
- │
- ▼
-/storage
- │
- ▼
-Railway Volume
- │
- ▼
-Persistent VM data
-
+```
+Railway → Service → Volumes → Add Volume → Mount path: /storage
+```
 
 ---
 
-🔐 Security
+## Local Testing
 
-This project exposes a graphical virtual machine through a public web endpoint.
+Build and run locally with Docker:
 
-Do not assume that exposing noVNC publicly is automatically secure.
-
-Consider:
-
-Authentication
-
-Private networking
-
-Access controls
-
-HTTPS
-
-Strong credentials
-
-Restricting public access
-
-Avoiding unnecessary exposed ports
-
-
-If you expose VNC directly on port 5900, treat it as a sensitive service.
-
-
----
-
-🖥️ Desktop Usage
-
-Once Linux Mint boots, you can use the browser interface as a normal graphical desktop.
-
-Typical workflow:
-
-Open Railway URL
-       ↓
-    noVNC
-       ↓
- Linux Mint login
-       ↓
-    Desktop
-       ↓
- Applications
-
-You can install applications inside the VM normally, subject to the VM's available resources.
-
-
----
-
-📊 Recommended Resource Profiles
-
-🟢 Lightweight
-
-CPU_CORES=2
-RAM_SIZE=4G
-DISK_SIZE=40G
-
-Good for:
-
-Basic desktop
-
-Terminal
-
-Lightweight applications
-
-
-
----
-
-🔵 Balanced
-
-CPU_CORES=4
-RAM_SIZE=8G
-DISK_SIZE=80G
-
-Good for:
-
-General desktop usage
-
-Lightweight development
-
-Browsing
-
-
-
----
-
-🟣 Heavy
-
-CPU_CORES=8
-RAM_SIZE=16G
-DISK_SIZE=150G
-
-Good for:
-
-Development
-
-Multiple applications
-
-Larger desktop workloads
-
-
-> Actual performance depends heavily on the Railway host and TCG overhead.
-
-
-
-
----
-
-🛠️ Troubleshooting
-
-/storage not found
-
-Error:
-
-ERROR: Storage folder (/storage) not found!
-
-Make sure your Dockerfile contains:
-
-RUN mkdir -p /storage
-
-
----
-
-KVM unavailable
-
-Error:
-
-ERROR: See the FAQ for possible causes,
-or disable acceleration by adding the "KVM=N" variable
-
-Set:
-
-KVM=N
-
-Do not rely only on:
-
-ARGUMENTS=-accel tcg
-
-because the QEMU container entrypoint performs its own KVM detection before launching QEMU.
-
-
----
-
-noVNC cannot be opened
-
-Verify that:
-
-8006
-
-is exposed and that Railway has generated a public domain.
-
-The primary web interface is:
-
-https://YOUR-RAILWAY-DOMAIN
-
-
----
-
-VM is extremely slow
-
-This is expected when using:
-
-KVM=N
-
-because QEMU is using software emulation.
-
-There is no Dockerfile setting that can make TCG perform exactly like KVM.
-
-If your deployment environment eventually provides /dev/kvm, hardware acceleration can be considered.
-
-
----
-
-Container keeps restarting
-
-Check Railway deployment logs.
-
-Common causes include:
-
-/storage missing
-KVM configuration
-insufficient RAM
-insufficient CPU
-QEMU boot failure
-networking configuration
-
-
----
-
-🔧 Useful Railway Configuration
-
-A typical deployment should look like:
-
-Railway Project
-│
-└── QEMU Mint Service
-    │
-    ├── Dockerfile
-    │
-    ├── Public Networking
-    │      └── :8006
-    │
-    ├── Environment
-    │      ├── BOOT=mint
-    │      ├── KVM=N
-    │      ├── CPU_CORES=8
-    │      ├── RAM_SIZE=16G
-    │      └── DISK_SIZE=550G
-    │
-    └── Optional Volume
-           └── /storage
-
-
----
-
-🧪 Local Docker Test
-
-You can also build the image locally:
-
+```bash
 docker build -t railway-qemu-mint .
-
-Run it:
 
 docker run --rm \
   -p 8006:8006 \
@@ -658,173 +242,129 @@ docker run --rm \
   -e RAM_SIZE=8G \
   -e DISK_SIZE=80G \
   railway-qemu-mint
+```
 
-Then open:
-
-http://localhost:8006
-
+Then open: `http://localhost:8006`
 
 ---
 
-🗂️ Recommended Repository Structure
+## Railway Service Layout
 
-For the minimal deployment:
+```
+Railway Project
+└── QEMU Mint Service
+    ├── Dockerfile
+    ├── Public Networking → :8006
+    ├── Environment
+    │   ├── BOOT=mint
+    │   ├── KVM=N
+    │   ├── CPU_CORES=8
+    │   ├── RAM_SIZE=16G
+    │   └── DISK_SIZE=550G
+    └── Volume (optional)
+        └── /storage
+```
 
+---
+
+## Troubleshooting
+
+**`ERROR: Storage folder (/storage) not found!`**
+
+Add to your Dockerfile:
+```dockerfile
+RUN mkdir -p /storage
+```
+
+**`ERROR: ... or disable acceleration by adding the "KVM=N" variable`**
+
+Set `KVM=N` as an environment variable. Do not rely solely on `-accel tcg` in QEMU arguments — the container entrypoint performs its own KVM check before launching QEMU.
+
+**noVNC page does not load**
+
+Verify port `8006` is exposed and that a Railway public domain has been generated.
+
+**VM is very slow**
+
+This is expected behavior with `KVM=N`. TCG software emulation has inherent overhead. There is no configuration that makes TCG match KVM performance.
+
+**Container keeps restarting**
+
+Check Railway deployment logs. Common causes: missing `/storage`, insufficient RAM or CPU allocation, KVM misconfiguration, QEMU boot failure.
+
+---
+
+## Security
+
+noVNC exposes a full graphical desktop through a public URL. Before deploying to production:
+
+- Enable authentication on the noVNC interface
+- Use HTTPS (Railway provides this by default)
+- Avoid exposing port `5900` publicly without a VPN or firewall
+- Set strong credentials for the Linux Mint user account
+- Restrict public access if the VM contains sensitive data
+
+---
+
+## Design Philosophy
+
+The Dockerfile is intentionally minimal. Rather than rebuilding QEMU, noVNC, or the container entrypoint from scratch, this project extends the maintained [`qemux/qemu`](https://github.com/qemux/qemu-docker) image and applies only the Railway-specific configuration:
+
+- `/storage` directory creation
+- `KVM=N` to disable hardware acceleration
+- Environment variables for OS, CPU, RAM, and disk
+
+This keeps the deployment easy to maintain and straightforward to upgrade when `qemux/qemu` releases new versions.
+
+---
+
+## Repository Structure
+
+```
 railway-qemu-mint/
-│
 ├── Dockerfile
 ├── README.md
 └── .gitignore
-
-The QEMU runtime itself is provided by:
-
-qemux/qemu
-
-so the repository does not need to contain the entire QEMU/noVNC implementation.
-
+```
 
 ---
 
-🚀 Deployment Philosophy
+## Requirements
 
-This project intentionally keeps the Dockerfile extremely small.
+- A Railway account
+- A GitHub repository
+- A Railway public domain (generated in service settings)
 
-Instead of rebuilding the complete QEMU environment:
-
-❌ Install QEMU manually
-❌ Rebuild noVNC
-❌ Copy internal qemux scripts
-❌ Recreate entrypoint
-❌ Recreate networking
-❌ Recreate VM management
-
-we use the maintained image:
-
-qemux/qemu
-
-and customize only the Railway-specific requirements:
-
-/storage
-KVM=N
-BOOT=mint
-CPU_CORES
-RAM_SIZE
-DISK_SIZE
-
-This makes the deployment easier to maintain and upgrade.
-
+No KVM device or special Docker runtime configuration is required.
 
 ---
 
-🧱 Dockerfile
+## Limitations
 
-The complete Dockerfile is:
-
-FROM qemux/qemu:latest
-
-RUN mkdir -p /storage
-
-ENV KVM="N"
-
-ENV BOOT="mint"
-ENV CPU_CORES="8"
-ENV RAM_SIZE="16G"
-ENV DISK_SIZE="550G"
-
-EXPOSE 22
-EXPOSE 5900
-EXPOSE 8006
-
+- CPU performance is lower than KVM-backed VMs
+- Desktop responsiveness may be reduced under TCG
+- Heavy workloads (compiling, video, large applications) may be impractical
+- VM storage is ephemeral without a Railway Volume
+- Resource limits are constrained by your Railway plan
 
 ---
 
-🛡️ Limitations
+## Contributing
 
-This project is not intended to replace a dedicated virtualization server.
+Contributions are welcome. A useful contribution includes:
 
-Because it uses TCG:
-
-CPU performance is lower than KVM
-
-Desktop responsiveness may vary
-
-Heavy workloads may be impractical
-
-VM storage is ephemeral without a Railway Volume
-
-Resource limits depend on your Railway plan
-
-Public noVNC access should be secured appropriately
-
-
-
----
-
-📚 Technologies
-
-This project is built around:
-
-QEMU
-
-noVNC
-
-Linux Mint
-
-Railway
-
-qemux/qemu
-
-
-
----
-
-🤝 Contributing
-
-Contributions, improvements, bug reports, and deployment tips are welcome.
-
-A good contribution should include:
-
-1. A clear description of the problem
-
-
-2. Reproduction steps
-
-
+1. A clear description of the problem or improvement
+2. Steps to reproduce (for bugs)
 3. Railway deployment logs if relevant
-
-
 4. Dockerfile changes where applicable
-
-
-5. Performance information when changing QEMU settings
-
-
-
+5. Performance notes when modifying QEMU settings
 
 ---
 
-⭐ Support
+## Technologies
 
-If this project helps you run Linux Mint on Railway:
-
-⭐ Star the repository
-
-🐛 Report reproducible issues
-
-💡 Suggest improvements
-
-🔀 Submit pull requests
-
-
-
----
-
-<div align="center">🖥️ Linux Mint in the Cloud
-
-QEMU + TCG + noVNC + Railway
-
-Made for environments where KVM isn't available.
-
-<br>⭐ Star the project if you find it useful!
-
-</div>
+- [QEMU](https://www.qemu.org/)
+- [noVNC](https://novnc.com/)
+- [Linux Mint](https://linuxmint.com/)
+- [Railway](https://railway.app/)
+- [qemux/qemu](https://github.com/qemux/qemu-docker)
