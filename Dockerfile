@@ -3,9 +3,6 @@ FROM --platform=linux/amd64 ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Jakarta
 
-# ------------------------------------------------------------
-# Base system + XFCE + VNC + noVNC + D-Bus
-# ------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xfce4 \
     xfce4-goodies \
@@ -34,13 +31,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     gnupg \
     software-properties-common \
+    unzip \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxshmfence1 \
+    libasound2 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxext6 \
+    libxrender1 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 
-# ------------------------------------------------------------
-# Firefox - Mozilla Team PPA
-# Native .deb, NOT Snap
-# ------------------------------------------------------------
+# ============================================================
+# Firefox native .deb
+# ============================================================
+
 RUN add-apt-repository ppa:mozillateam/ppa -y
 
 RUN printf '%s\n' \
@@ -49,46 +67,71 @@ RUN printf '%s\n' \
     'Pin-Priority: 1001' \
     > /etc/apt/preferences.d/mozilla-firefox
 
-RUN apt-get update && apt-get install -y \
-    firefox \
+RUN apt-get update && apt-get install -y firefox \
     && rm -rf /var/lib/apt/lists/*
 
 
-# ------------------------------------------------------------
-# Flatpak
-# ------------------------------------------------------------
-RUN apt-get update && apt-get install -y \
-    flatpak \
-    && rm -rf /var/lib/apt/lists/*
+# ============================================================
+# Chromium native binary
+# No Snap
+# No Flatpak
+# ============================================================
 
-# Add Flathub
-RUN flatpak remote-add --if-not-exists \
-    flathub \
-    https://dl.flathub.org/repo/flathub.flatpakrepo
+RUN CHROMIUM_REV=$(curl -fsSL \
+    https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/LAST_CHANGE) \
+    && echo "Chromium revision: ${CHROMIUM_REV}" \
+    && curl -fL \
+    "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${CHROMIUM_REV}/chrome-linux.zip" \
+    -o /tmp/chromium.zip \
+    && unzip -q /tmp/chromium.zip -d /opt \
+    && mv /opt/chrome-linux /opt/chromium \
+    && rm -f /tmp/chromium.zip
 
-# Install Chromium from Flathub
-# This is Chromium Flatpak, NOT Snap.
-RUN flatpak install -y flathub org.chromium.Chromium
+
+RUN cat > /usr/local/bin/chromium-browser <<'EOF'
+#!/bin/bash
+exec /opt/chromium/chrome \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    "$@"
+EOF
+
+RUN chmod +x /usr/local/bin/chromium-browser
+
+RUN ln -sf /usr/local/bin/chromium-browser /usr/local/bin/chromium
 
 
-# ------------------------------------------------------------
-# XFCE / VNC configuration
-# ------------------------------------------------------------
+# ============================================================
+# XFCE launcher
+# ============================================================
+
+RUN mkdir -p /root/.local/share/applications && \
+    cat > /root/.local/share/applications/chromium.desktop <<'EOF'
+[Desktop Entry]
+Name=Chromium
+Comment=Chromium Web Browser
+Exec=/usr/local/bin/chromium %U
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true
+EOF
+
+
+# ============================================================
+# VNC
+# ============================================================
+
 RUN mkdir -p /root/.vnc
 
 COPY xstartup /root/.vnc/xstartup
 COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /root/.vnc/xstartup \
+RUN chmod +x \
+    /root/.vnc/xstartup \
     /entrypoint.sh
 
-
-# Avoid Flatpak XDG_DATA_DIRS warning
-ENV XDG_DATA_DIRS=/usr/local/share:/usr/share:/var/lib/flatpak/exports/share:/root/.local/share/flatpak/exports/share
-
-
-# VNC + noVNC
-EXPOSE 5901
-EXPOSE 6080
+EXPOSE 8080
 
 CMD ["/entrypoint.sh"]
