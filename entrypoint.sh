@@ -59,7 +59,8 @@ vncserver :1 \
     -geometry 1280x800 \
     -depth 24 \
     -localhost no \
-    -SecurityTypes None
+    -SecurityTypes None \
+    --I-KNOW-THIS-IS-INSECURE
 
 
 # ============================================================
