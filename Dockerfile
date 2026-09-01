@@ -1,17 +1,94 @@
 FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update -y && apt install --no-install-recommends -y xfce4 xfce4-goodies tigervnc-standalone-server novnc websockify sudo xterm init systemd snapd vim net-tools curl wget git tzdata
-RUN apt update -y && apt install -y dbus-x11 x11-utils x11-xserver-utils x11-apps
-RUN apt install software-properties-common -y
+ENV TZ=Asia/Jakarta
+
+# ------------------------------------------------------------
+# Base system + XFCE + VNC + noVNC + D-Bus
+# ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xfce4 \
+    xfce4-goodies \
+    xubuntu-icon-theme \
+    tigervnc-standalone-server \
+    tigervnc-common \
+    novnc \
+    websockify \
+    dbus \
+    dbus-x11 \
+    xdg-desktop-portal \
+    xdg-desktop-portal-gtk \
+    xauth \
+    x11-utils \
+    x11-xserver-utils \
+    x11-apps \
+    xterm \
+    openssl \
+    ca-certificates \
+    sudo \
+    vim \
+    net-tools \
+    curl \
+    wget \
+    git \
+    tzdata \
+    gnupg \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# ------------------------------------------------------------
+# Firefox - Mozilla Team PPA
+# Native .deb, NOT Snap
+# ------------------------------------------------------------
 RUN add-apt-repository ppa:mozillateam/ppa -y
-RUN echo 'Package: *' >> /etc/apt/preferences.d/mozilla-firefox
-RUN echo 'Pin: release o=LP-PPA-mozillateam' >> /etc/apt/preferences.d/mozilla-firefox
-RUN echo 'Pin-Priority: 1001' >> /etc/apt/preferences.d/mozilla-firefox
-RUN echo 'Unattended-Upgrade::Allowed-Origins:: "LP-PPA-mozillateam:jammy";' | tee /etc/apt/apt.conf.d/51unattended-upgrades-firefox
-RUN apt update -y && apt install -y firefox
-RUN apt update -y && apt install -y xubuntu-icon-theme
-RUN touch /root/.Xauthority
+
+RUN printf '%s\n' \
+    'Package: firefox*' \
+    'Pin: release o=LP-PPA-mozillateam' \
+    'Pin-Priority: 1001' \
+    > /etc/apt/preferences.d/mozilla-firefox
+
+RUN apt-get update && apt-get install -y \
+    firefox \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# ------------------------------------------------------------
+# Flatpak
+# ------------------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    flatpak \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Flathub
+RUN flatpak remote-add --if-not-exists \
+    flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
+
+# Install Chromium from Flathub
+# This is Chromium Flatpak, NOT Snap.
+RUN flatpak install -y flathub org.chromium.Chromium
+
+
+# ------------------------------------------------------------
+# XFCE / VNC configuration
+# ------------------------------------------------------------
+RUN mkdir -p /root/.vnc
+
+COPY xstartup /root/.vnc/xstartup
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /root/.vnc/xstartup \
+    /entrypoint.sh
+
+
+# Avoid Flatpak XDG_DATA_DIRS warning
+ENV XDG_DATA_DIRS=/usr/local/share:/usr/share:/var/lib/flatpak/exports/share:/root/.local/share/flatpak/exports/share
+
+
+# VNC + noVNC
 EXPOSE 5901
 EXPOSE 6080
-CMD bash -c "vncserver -localhost no -SecurityTypes None -geometry 1024x768 --I-KNOW-THIS-IS-INSECURE && openssl req -new -subj "/C=JP" -x509 -days 365 -nodes -out self.pem -keyout self.pem && websockify -D --web=/usr/share/novnc/ --cert=self.pem 6080 localhost:5901 && tail -f /dev/null"
+
+CMD ["/entrypoint.sh"]
