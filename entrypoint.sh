@@ -2,110 +2,142 @@
 
 set -e
 
+# ============================================================
+# Railway environment
+# ============================================================
+
+PORT="${PORT:-8080}"
+
 export HOME=/root
 export USER=root
+export DISPLAY=:1
 
-echo "=========================================="
-echo " Starting Ubuntu XFCE container"
-echo "=========================================="
+echo "=================================================="
+echo " Railway XFCE Desktop Container"
+echo "=================================================="
+echo "PORT    : ${PORT}"
+echo "DISPLAY : ${DISPLAY}"
+echo "=================================================="
 
-# ------------------------------------------------------------
-# Prepare runtime directories
-# ------------------------------------------------------------
+
+# ============================================================
+# Runtime directories
+# ============================================================
+
 mkdir -p /run/dbus
 mkdir -p /root/.vnc
 
-# ------------------------------------------------------------
+
+# ============================================================
 # Start D-Bus system bus
 # No systemd required
-# ------------------------------------------------------------
+# ============================================================
+
 if [ ! -S /run/dbus/system_bus_socket ]; then
     echo "[+] Starting D-Bus system bus..."
     dbus-daemon --system --fork
-else
-    echo "[+] D-Bus system bus already running"
 fi
 
-# ------------------------------------------------------------
-# Remove stale VNC lock / PID files
-# ------------------------------------------------------------
+
+# ============================================================
+# Clean stale VNC files
+# ============================================================
+
 rm -f /tmp/.X1-lock
 rm -f /tmp/.X11-unix/X1
 rm -f /root/.vnc/*.pid
 
-# ------------------------------------------------------------
-# Generate VNC password file if it does not exist
-# ------------------------------------------------------------
-if [ ! -f /root/.vnc/passwd ]; then
-    echo "[+] Creating VNC password file..."
 
-    # Password: change-this
-    mkdir -p /root/.vnc
-
-    printf '%s\n' 'change-this' | \
-        vncpasswd -f > /root/.vnc/passwd
-
-    chmod 600 /root/.vnc/passwd
-fi
-
-# ------------------------------------------------------------
+# ============================================================
 # Start TigerVNC
-# ------------------------------------------------------------
-echo "[+] Starting TigerVNC..."
+# NO PASSWORD
+# ============================================================
+
+echo "[+] Starting TigerVNC without password..."
 
 vncserver :1 \
-    -geometry 1024x768 \
+    -geometry 1280x800 \
     -depth 24 \
     -localhost no \
-    -SecurityTypes VncAuth
+    -SecurityTypes None
 
-# ------------------------------------------------------------
-# Create self-signed certificate for noVNC
-# ------------------------------------------------------------
-if [ ! -f /root/self.pem ]; then
-    echo "[+] Creating noVNC certificate..."
 
-    openssl req \
-        -new \
-        -x509 \
-        -nodes \
-        -days 3650 \
-        -subj "/C=ID/O=Docker/OU=XFCE/CN=localhost" \
-        -keyout /root/self.key \
-        -out /root/self.crt
+# ============================================================
+# Wait for VNC
+# ============================================================
 
-    cat /root/self.key /root/self.crt > /root/self.pem
+echo "[+] Waiting for VNC..."
+
+for i in $(seq 1 30); do
+    if [ -S /tmp/.X11-unix/X1 ]; then
+        break
+    fi
+
+    sleep 1
+done
+
+if [ ! -S /tmp/.X11-unix/X1 ]; then
+    echo "[ERROR] VNC X11 socket was not created."
+    exit 1
 fi
 
-# ------------------------------------------------------------
+
+# ============================================================
 # Start noVNC
-# ------------------------------------------------------------
-echo "[+] Starting noVNC on port 6080..."
+#
+# Railway provides HTTPS externally.
+# Container listens on plain HTTP.
+# ============================================================
+
+echo "[+] Starting noVNC on port ${PORT}..."
 
 websockify \
     --web=/usr/share/novnc/ \
-    --cert=/root/self.pem \
-    6080 \
-    localhost:5901 &
+    "0.0.0.0:${PORT}" \
+    "127.0.0.1:5901" &
+
+NOVNC_PID=$!
+
+
+# ============================================================
+# Check noVNC
+# ============================================================
+
+sleep 2
+
+if ! kill -0 "${NOVNC_PID}" 2>/dev/null; then
+    echo "[ERROR] noVNC failed to start."
+    exit 1
+fi
+
+
+# ============================================================
+# Ready
+# ============================================================
 
 echo ""
-echo "=========================================="
-echo " Container is ready"
-echo "=========================================="
+echo "=================================================="
+echo " Desktop is ready"
+echo "=================================================="
 echo ""
-echo " XFCE / noVNC:"
-echo " http://localhost:6080/vnc.html"
+echo " Open:"
 echo ""
-echo " VNC:"
-echo " localhost:5901"
+echo "   https://YOUR-RAILWAY-DOMAIN/vnc.html"
 echo ""
 echo " Firefox:"
-echo " firefox"
+echo "   firefox"
 echo ""
 echo " Chromium:"
-echo " flatpak run org.chromium.Chromium"
+echo "   flatpak run org.chromium.Chromium"
 echo ""
-echo "=========================================="
+echo " VNC authentication:"
+echo "   DISABLED"
+echo ""
+echo "=================================================="
 
+
+# ============================================================
 # Keep container alive
-wait
+# ============================================================
+
+wait "${NOVNC_PID}"
